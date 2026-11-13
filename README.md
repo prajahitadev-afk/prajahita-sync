@@ -26,7 +26,7 @@ Set these server-only environment variables:
 - `WEBHOOK_SECRET` — long random secret also configured on each Shop database webhook.
 - `PORT` — optional HTTP port (default 3000).
 
-A Shop service-role key is not required: the webhook payload contains the source row. Do not commit `.env` or any real secret.
+A Shop service-role key is not required: the webhook payload contains the source row. The Employee project keeps the same primary keys and adds sync metadata columns. Do not commit `.env` or any real secret.
 
 ## Endpoints
 
