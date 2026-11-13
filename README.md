@@ -1,60 +1,52 @@
 # prajahita-sync
 
-Production-ready Node.js service that mirrors Shop Supabase webhook events into an Employee Supabase project.
+A server-side webhook receiver that mirrors Shop Supabase records into the Employee/Management Supabase project.
 
-## Requirements
+## Data flow
+
+Shop Supabase database webhooks send INSERT, UPDATE, and DELETE payloads to this service. Supported source tables are `customers`, `orders`, `order_items`, and `payments`. An order INSERT also creates one corresponding notification in the destination `notifications` table.
+
+## Requirements and setup
 
 - Node.js 22+
-- A Shop Supabase project with database webhooks configured
-- An Employee Supabase project with the synced tables
-
-## Setup
+- Shop Supabase database webhooks configured for the supported tables
+- Employee/Management Supabase destination tables
+- A private shared webhook secret
 
 ```bash
 npm install
-copy .env.example .env
-```
-
-Fill `.env` with both Supabase URLs, service-role keys, and a shared `WEBHOOK_SECRET`. Service-role keys are server-only secrets and must never be exposed to a browser.
-
-Start the service:
-
-```bash
+cp .env.example .env
 npm start
 ```
 
-The service listens on `PORT` (default `3000`). Railway can run it without modification using the `start` script in `package.json`.
+Set these server-only environment variables:
+
+- `EMP_SUPABASE_URL` — destination Supabase URL.
+- `EMP_SUPABASE_SERVICE_ROLE_KEY` — destination service-role key; never expose it to a browser.
+- `WEBHOOK_SECRET` — long random secret also configured on each Shop database webhook.
+- `PORT` — optional HTTP port (default 3000).
+
+A Shop service-role key is not required: the webhook payload contains the source row. The Employee project keeps the same primary keys and adds sync metadata columns. Do not commit `.env` or any real secret.
 
 ## Endpoints
 
-- `GET /health` returns the service health status.
-- `POST /webhook` accepts `INSERT`, `UPDATE`, and `DELETE` Supabase webhook events.
+- `GET /health` — liveness check; works without database credentials.
+- `GET /ready` — verifies destination database connectivity using the `customers` table.
+- `POST /webhook` — authenticated webhook receiver.
 
-Configure the Shop database webhook URL as:
+Configure the Shop webhook URL as `https://<your-service-domain>/webhook` and send the `x-webhook-secret` header with the exact `WEBHOOK_SECRET` value.
 
-```text
-https://<your-railway-domain>/webhook
-```
+## Reliability and security
 
-Send the shared secret in the `x-webhook-secret` header. Events for tables other than `customers`, `orders`, `order_items`, and `payments` are acknowledged and ignored.
+- Upserts use the source primary key with explicit `onConflict: 'id'`.
+- Synced rows are tagged `source_db: 'shop'` and receive a `sync_updated_at` timestamp.
+- Order notifications use a deterministic UUID, so webhook retries update the same notification rather than duplicating it.
+- Deletes use the actual source primary key (`id`); deleting an order also removes its corresponding notification.
+- Webhook secret comparison uses `crypto.timingSafeEqual`.
+- Unsupported tables are acknowledged and ignored; malformed supported events are rejected.
+- Database errors are logged server-side; callers receive a generic retryable 502 response.
+- Health and readiness are separate, so a temporary database outage does not make the process appear dead.
 
-## Webhook payload
+## Tests
 
-```json
-{
-  "type": "INSERT",
-  "table": "orders",
-  "record": {},
-  "old_record": {}
-}
-```
-
-`old_record` is used for `DELETE` events. Order inserts also create a corresponding row in `notifications`.
-
-## Security and operations
-
-- Supabase service-role keys are loaded only on the server.
-- Webhooks require `x-webhook-secret` to match `WEBHOOK_SECRET`.
-- Helmet, CORS, JSON parsing, and request logging are enabled.
-- Sync failures return `{ "success": false, "error": "..." }` and are logged without crashing the process.
-- `SIGTERM` and `SIGINT` are handled for graceful deployment shutdowns.
+Run `npm test`. Tests use Node's built-in test runner and do not require a live Supabase project.

@@ -1,38 +1,21 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const requiredEnvironment = [
-  'SHOP_SUPABASE_URL',
-  'SHOP_SUPABASE_SERVICE_ROLE_KEY',
-  'EMP_SUPABASE_URL',
-  'EMP_SUPABASE_SERVICE_ROLE_KEY',
-  'WEBHOOK_SECRET'
-];
+let employeeClient;
 
-function getEnvironmentValue(name) {
+function required(name) {
   const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
+  if (!value || !value.trim()) throw new Error(`Missing required environment variable: ${name}`);
+  return value.trim();
 }
 
-function createSupabaseClients() {
-  for (const name of requiredEnvironment) {
-    getEnvironmentValue(name);
+// Webhook payloads contain the source record; only destination credentials are needed.
+function getEmployeeClient() {
+  if (!employeeClient) {
+    employeeClient = createClient(required('EMP_SUPABASE_URL'), required('EMP_SUPABASE_SERVICE_ROLE_KEY'), {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
   }
-
-  const shopClient = createClient(
-    getEnvironmentValue('SHOP_SUPABASE_URL'),
-    getEnvironmentValue('SHOP_SUPABASE_SERVICE_ROLE_KEY')
-  );
-  const employeeClient = createClient(
-    getEnvironmentValue('EMP_SUPABASE_URL'),
-    getEnvironmentValue('EMP_SUPABASE_SERVICE_ROLE_KEY')
-  );
-
-  return { shopClient, employeeClient };
+  return employeeClient;
 }
 
-const { shopClient, employeeClient } = createSupabaseClients();
-
-module.exports = { shopClient, employeeClient };
+module.exports = { getEmployeeClient };

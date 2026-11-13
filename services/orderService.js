@@ -1,17 +1,4 @@
-const { employeeClient } = require('../config/supabase');
-
-async function upsertOrder(record) {
-  const { error } = await employeeClient.from('orders').upsert(record);
-  if (error) {
-    throw error;
-  }
-}
-
-async function deleteOrder(record) {
-  const { error } = await employeeClient.from('orders').delete().eq('id', record.id);
-  if (error) {
-    throw error;
-  }
-}
-
+const { upsertShopRecord, deleteShopRecord } = require('../utils/sync');
+const upsertOrder = record => upsertShopRecord('orders', record);
+const deleteOrder = record => deleteShopRecord('orders', record);
 module.exports = { upsertOrder, deleteOrder };
