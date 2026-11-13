@@ -1,6 +1,6 @@
 {
   "name": "prajahita-sync",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "description": "Reliable Shop-to-Employee Supabase webhook synchronization service.",
   "main": "server.js",
   "type": "commonjs",
